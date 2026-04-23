@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Quest Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+        body { font-family: 'Fredoka', sans-serif; }
+        .view { display: none; }
+        .view.active { display: flex; }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            z-index: 100;
+            pointer-events: none;
+            border-radius: 50%;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-sky-100 min-h-screen overflow-x-hidden">
+
+    <!-- View: Error -->
+    <div id="view-error" class="view min-h-screen items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border-t-8 border-rose-400 text-center">
+            <div class="bg-rose-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="settings" class="text-rose-500 w-10 h-10"></i>
+            </div>
+            <h1 class="text-2xl font-black text-slate-800 mb-4">Connection Issue</h1>
+            <div id="error-message" class="bg-rose-50 p-4 rounded-xl text-rose-700 text-sm mb-6 text-left leading-relaxed"></div>
+            <button onclick="window.location.reload()" class="w-full bg-slate-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i> Retry Connection
+            </button>
+        </div>
+    </div>
+
+    <!-- View: Loading -->
+    <div id="view-loading" class="view active min-h-screen items-center justify-center p-4">
+        <div class="text-center">
+            <div class="animate-bounce mb-4">
+                <i data-lucide="sparkles" class="text-sky-500 w-12 h-12 mx-auto"></i>
+            </div>
+            <p class="text-slate-500 font-bold">Connecting to Quest Servers...</p>
+        </div>
+    </div>
+
+    <!-- View: Login -->
+    <div id="view-login" class="view min-h-screen items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border-t-8 border-sky-400 text-center">
+            <div class="bg-sky-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="user" class="text-sky-500 w-10 h-10"></i>
+            </div>
+            <h1 class="text-3xl font-black text-slate-800 mb-2">Welcome Explorer!</h1>
+            <p class="text-slate-500 mb-8">Enter a username to start your quest.</p>
+            <input type="text" id="username-input" placeholder="CoolUsername123" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl mb-4 text-center text-xl font-bold outline-sky-400">
+            <button onclick="handleRegister()" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                START PLAYING <i data-lucide="play" fill="currentColor" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="view min-h-screen flex-col p-4">
+        <!-- Navigation -->
+        <nav class="max-w-2xl w-full mx-auto flex justify-between items-center mb-4 bg-white/50 backdrop-blur-sm p-3 rounded-2xl shadow-sm">
+            <div class="flex items-center gap-3">
+                <div id="user-avatar" class="bg-sky-500 p-2 rounded-lg text-white font-bold w-10 h-10 flex items-center justify-center">?</div>
+                <span id="user-display-name" class="font-bold text-slate-700 hidden sm:block">User</span>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="showPage('game')" id="nav-game" class="px-4 py-2 rounded-xl font-bold transition-all">Play</button>
+                <button onclick="showPage('leaderboard')" id="nav-leaderboard" class="px-4 py-2 rounded-xl font-bold transition-all">Hall of Fame</button>
+            </div>
+            <div class="flex items-center gap-2 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+                <i data-lucide="sparkles" class="text-amber-400 w-4 h-4" fill="currentColor"></i>
+                <span id="user-points" class="font-black text-slate-700">0</span>
+            </div>
+        </nav>
+
+        <main class="max-w-md w-full mx-auto flex-1 flex flex-col">
+            <!-- Page: Game -->
+            <div id="page-game" class="bg-white rounded-3xl p-6 shadow-xl border-b-8 border-sky-200 relative overflow-hidden flex-1 flex flex-col hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <span id="quest-number" class="bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-500 uppercase tracking-wider">Quest #1</span>
+                    <div class="flex items-center gap-1 text-slate-500 font-bold text-sm">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span id="attempt-count">0</span> Tries
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col items-center justify-center py-4">
+                    <div id="mascot-emoji" class="text-7xl mb-4 transition-transform duration-300">🤖</div>
+
+                    <div id="feedback-box" class="w-full p-4 rounded-2xl mb-6 text-center font-bold text-lg border-2 border-dashed bg-slate-50 border-slate-200 text-slate-600">
+                        <div class="flex items-center justify-center gap-2">
+                            <span id="feedback-text">Enter a number!</span>
+                        </div>
+                    </div>
+
+                    <div id="game-controls" class="w-full space-y-3">
+                        <input type="number" id="guess-input" placeholder="??" class="w-full p-6 text-4xl font-black text-center bg-slate-50 border-4 border-slate-100 rounded-3xl outline-sky-400">
+                        <div class="flex gap-2">
+                            <button onclick="submitGuess()" class="bg-sky-500 hover:bg-sky-600 text-white font-black py-4 px-8 rounded-2xl shadow-md flex items-center justify-center gap-2 grow transition-transform active:scale-95">
+                                GUESS <i data-lucide="target" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="useHint()" class="bg-amber-400 hover:bg-amber-500 text-white p-4 rounded-2xl shadow-md transition-transform active:scale-95 flex items-center justify-center">
+                                <i data-lucide="lightbulb" fill="white" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="next-round-btn" onclick="startNewGame()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-lg transition-all transform hover:scale-105 hidden items-center justify-center gap-2">
+                        PLAY NEXT ROUND <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                    </button>
+
+                    <!-- Range Indicator -->
+                    <div class="w-full mt-6">
+                        <div class="flex justify-between text-xs font-bold text-slate-400 mb-2 px-1">
+                            <span>1</span><span>50</span><span>100</span>
+                        </div>
+                        <div id="range-bars" class="flex gap-1 px-1"></div>
+                        <p class="text-xs text-slate-500 mt-2 font-medium text-center">
+                            Target is between <span id="min-range" class="text-sky-600 font-bold">1</span> and <span id="max-range" class="text-sky-600 font-bold">100</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page: Leaderboard -->
+            <div id="page-leaderboard" class="bg-white rounded-3xl p-6 shadow-xl border-b-8 border-amber-200 flex-1 hidden">
+                <h2 class="text-2xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                    <i data-lucide="trophy" class="text-amber-400 w-6 h-6" fill="currentColor"></i> Hall of Fame
+                </h2>
+                <div id="leaderboard-list" class="space-y-3">
+                    <div class="text-center py-10 text-slate-400 font-medium italic">Loading explorers...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Decorative background clouds -->
+    <div class="fixed bottom-[-20px] left-[-20px] opacity-10 pointer-events-none -z-10">
+        <svg width="200" height="100" viewBox="0 0 200 100"><path fill="white" d="M30 100 A40 40 0 0 1 30 20 A40 40 0 0 1 90 20 A40 40 0 0 1 150 20 A40 40 0 0 1 150 100 Z" /></svg>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyATcdqnVp97i_ycisFF3T5XVcxF5dNjNGM",
+            authDomain: "number-quest-31f41.firebaseapp.com",
+            projectId: "number-quest-31f41",
+            storageBucket: "number-quest-31f41.firebasestorage.app",
+            messagingSenderId: "313020962346",
+            appId: "1:313020962346:web:3793ecb84e04093e875553",
+            measurementId: "G-15TPL7FWFN"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Environment IDs
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "number-quest-pro-html-v2";
+
+        // Global State
+        let currentUser = null;
+        let userData = null;
+        let targetNumber = 0;
+        let attempts = 0;
+        let range = { min: 1, max: 100 };
+        let isGameOver = false;
+        let hintIndex = 0;
+
+        // Init App
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initAuth();
+        });
+
+        async function initAuth() {
+            try {
+                // Attempt to use custom token if provided
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (tokenErr) {
+                        console.warn("Custom token failed (likely mismatch), falling back to anonymous:", tokenErr);
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Fatal Auth Error:", err);
+                if (err.code === 'auth/configuration-not-found') {
+                    showView('error');
+                    document.getElementById('error-message').innerText = "Anonymous login is not enabled in the Firebase Console. If you are a developer, enable it under Authentication > Sign-in method.";
+                    return;
+                }
+                showView('error');
+                document.getElementById('error-message').innerText = "Could not connect to the server: " + err.message;
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    checkUserStatus();
+                } else {
+                    showView('login');
+                }
+            });
+        }
+
+        async function checkUserStatus() {
+            try {
+                // Doc segments must be even (6)
+                const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'main');
+                const snap = await getDoc(userDocRef);
+                if (snap.exists()) {
+                    userData = snap.data();
+                    updateUserUI();
+                    showView('app');
+                    showPage('game');
+                    startNewGame();
+                    listenToLeaderboard();
+                } else {
+                    showView('login');
+                }
+            } catch (err) {
+                console.error("User Status Error:", err);
+                if (err.code === 'permission-denied') {
+                    setTimeout(checkUserStatus, 1500);
+                }
+            }
+        }
+
+        function listenToLeaderboard() {
+            if (!currentUser) return;
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+            onSnapshot(q, (snapshot) => {
+                const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const sorted = list.sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 10);
+                renderLeaderboard(sorted);
+            }, (err) => {
+                console.error("Leaderboard Snapshot Error:", err);
+            });
+        }
+
+        // Logic Functions
+        window.handleRegister = async () => {
+            const name = document.getElementById('username-input').value.trim();
+            if (!name || !currentUser) return;
+
+            userData = {
+                username: name,
+                points: 0,
+                gamesPlayed: 0,
+                bestAttempt: Infinity,
+                uid: currentUser.uid
+            };
+
+            try {
+                await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'main'), userData);
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', currentUser.uid), {
+                    username: name,
+                    points: 0
+                });
+
+                updateUserUI();
+                showView('app');
+                showPage('game');
+                startNewGame();
+                listenToLeaderboard();
+            } catch (err) {
+                console.error("Registration Error:", err);
+                alert("Failed to save profile. Check Firestore rules/connection.");
+            }
+        };
+
+        window.startNewGame = () => {
+            targetNumber = Math.floor(Math.random() * 100) + 1;
+            attempts = 0;
+            hintIndex = 0;
+            range = { min: 1, max: 100 };
+            isGameOver = false;
+
+            document.getElementById('guess-input').value = '';
+            document.getElementById('guess-input').disabled = false;
+            document.getElementById('game-controls').classList.remove('hidden');
+            document.getElementById('next-round-btn').classList.add('hidden');
+            document.getElementById('quest-number').innerText = `Quest #${(userData.gamesPlayed || 0) + 1}`;
+            
+            updateFeedback("Pick a number between 1 and 100!", "default", "🤖");
+            updateStatsUI();
+            renderRangeIndicator();
+        };
+
+        window.submitGuess = async () => {
+            if (isGameOver || !currentUser) return;
+            const input = document.getElementById('guess-input');
+            const guess = parseInt(input.value);
+
+            if (isNaN(guess) || guess < 1 || guess > 100) {
+                updateFeedback("Oops! Numbers 1-100 only.", "default", "🧐");
+                return;
+            }
+
+            attempts++;
+            if (guess === targetNumber) {
+                handleWin();
+            } else if (guess > targetNumber) {
+                range.max = Math.min(range.max, guess - 1);
+                updateFeedback("Too High! Try smaller.", "high", "😮");
+            } else {
+                range.min = Math.max(range.min, guess + 1);
+                updateFeedback("Too Low! Try bigger.", "low", "🤔");
+            }
+
+            input.value = '';
+            input.focus();
+            updateStatsUI();
+            renderRangeIndicator();
+        };
+
+        async function handleWin() {
+            isGameOver = true;
+            const pointsEarned = Math.max(10, 100 - (attempts * 5));
+            
+            updateFeedback(`Correct! Found it in ${attempts} tries!`, "success", "🥳");
+            document.getElementById('game-controls').classList.add('hidden');
+            document.getElementById('next-round-btn').classList.remove('hidden');
+            document.getElementById('guess-input').disabled = true;
+
+            try {
+                const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'main');
+                const publicDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', currentUser.uid);
+                
+                await updateDoc(userDocRef, {
+                    points: increment(pointsEarned),
+                    gamesPlayed: increment(1)
+                });
+                await updateDoc(publicDocRef, { points: increment(pointsEarned) });
+
+                userData.points += pointsEarned;
+                userData.gamesPlayed += 1;
+                updateUserUI();
+            } catch (err) {
+                console.error("Score Update Error:", err);
+            }
+            createConfetti();
+        }
+
+        window.useHint = () => {
+            if (isGameOver) return;
+            attempts++;
+            const hints = [
+                targetNumber % 2 === 0 ? "It's an EVEN number! 🔢" : "It's an ODD number! 🔢",
+                targetNumber > 50 ? "It's greater than 50. 📈" : "It's 50 or less. 📉",
+                `The number is between ${Math.max(1, targetNumber - 10)} and ${Math.min(100, targetNumber + 10)}! 🔍`
+            ];
+            updateFeedback(`Hint: ${hints[hintIndex % hints.length]}`, "hint", "💡");
+            hintIndex++;
+            updateStatsUI();
+        };
+
+        // UI Utilities
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active', 'flex'));
+            const target = document.getElementById(`view-${viewId}`) || document.getElementById('app-container');
+            target.classList.add('active');
+            if (['app', 'loading', 'error'].includes(viewId)) {
+                target.classList.add('flex');
+            }
+        }
+
+        window.showPage = (pageId) => {
+            document.getElementById('page-game').classList.add('hidden');
+            document.getElementById('page-leaderboard').classList.add('hidden');
+            
+            const gameBtn = document.getElementById('nav-game');
+            const boardBtn = document.getElementById('nav-leaderboard');
+
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+            if (pageId === 'game') {
+                gameBtn.className = "px-4 py-2 rounded-xl font-bold transition-all bg-sky-500 text-white shadow-md";
+                boardBtn.className = "px-4 py-2 rounded-xl font-bold transition-all hover:bg-amber-100 text-amber-700";
+            } else {
+                boardBtn.className = "px-4 py-2 rounded-xl font-bold transition-all bg-amber-400 text-white shadow-md";
+                gameBtn.className = "px-4 py-2 rounded-xl font-bold transition-all hover:bg-sky-200 text-sky-700";
+            }
+        };
+
+        function updateFeedback(text, type, emoji) {
+            const box = document.getElementById('feedback-box');
+            const txt = document.getElementById('feedback-text');
+            const mas = document.getElementById('mascot-emoji');
+
+            txt.innerText = text;
+            mas.innerText = emoji;
+            
+            box.className = "w-full p-4 rounded-2xl mb-6 text-center font-bold text-lg border-2 border-dashed transition-colors ";
+            if (type === 'success') box.className += "bg-emerald-50 border-emerald-400 text-emerald-700";
+            else if (type === 'high') box.className += "bg-rose-50 border-rose-400 text-rose-700";
+            else if (type === 'low') box.className += "bg-amber-50 border-amber-400 text-amber-700";
+            else if (type === 'hint') box.className += "bg-yellow-50 border-yellow-400 text-yellow-800";
+            else box.className += "bg-slate-50 border-slate-200 text-slate-600";
+
+            mas.classList.remove('scale-125');
+            void mas.offsetWidth;
+            mas.classList.add('scale-125');
+            setTimeout(() => mas.classList.remove('scale-125'), 300);
+        }
+
+        function updateUserUI() {
+            if (!userData) return;
+            document.getElementById('user-avatar').innerText = userData.username[0].toUpperCase();
+            document.getElementById('user-display-name').innerText = userData.username;
+            document.getElementById('user-points').innerText = userData.points;
+        }
+
+        function updateStatsUI() {
+            document.getElementById('attempt-count').innerText = attempts;
+        }
+
+        function renderRangeIndicator() {
+            const container = document.getElementById('range-bars');
+            container.innerHTML = '';
+            for (let i = 1; i <= 10; i++) {
+                const start = (i - 1) * 10 + 1;
+                const end = i * 10;
+                const isOut = end < range.min || start > range.max;
+                
+                const bar = document.createElement('div');
+                bar.className = `h-4 flex-1 rounded-sm transition-all duration-500 ${isOut ? 'bg-slate-200 opacity-30' : 'bg-sky-400 shadow-sm'}`;
+                container.appendChild(bar);
+            }
+            document.getElementById('min-range').innerText = range.min;
+            document.getElementById('max-range').innerText = range.max;
+        }
+
+        function renderLeaderboard(data) {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = data.length ? '' : '<div class="text-center py-10 text-slate-400 font-medium italic">No explorers yet!</div>';
+            data.forEach((entry, idx) => {
+                const item = document.createElement('div');
+                const isMe = entry.id === currentUser?.uid;
+                item.className = `flex items-center p-4 rounded-2xl border-2 transition-colors ${isMe ? 'border-sky-400 bg-sky-50 shadow-inner' : 'border-slate-50 bg-slate-50'}`;
+                item.innerHTML = `
+                    <div class="w-8 font-black text-slate-400">${idx + 1}</div>
+                    <div class="flex-1 font-bold text-slate-700 truncate mr-2">${entry.username} ${isMe ? '(You)' : ''}</div>
+                    <div class="flex items-center gap-1 font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full text-sm">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5" fill="currentColor"></i> ${entry.points}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function createConfetti() {
+            for (let i = 0; i < 40; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                c.style.top = '-10px';
+                document.body.appendChild(c);
+                c.animate([
+                    { transform: 'translateY(0) rotate(0)', opacity: 1 },
+                    { transform: `translateY(100vh) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                ], { duration: 2000 + Math.random() * 1000 }).onfinish = () => c.remove();
+            }
+        }
+    </script>
+</body>
+</html>

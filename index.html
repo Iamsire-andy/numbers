@@ -21,6 +21,12 @@
         }
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .tab-btn.active {
+            background-color: white;
+            color: #0ea5e9;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
     </style>
 </head>
 <body class="bg-sky-100 min-h-screen overflow-x-hidden">
@@ -49,17 +55,34 @@
         </div>
     </div>
 
-    <!-- View: Login -->
+    <!-- View: Login / Register -->
     <div id="view-login" class="view min-h-screen items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border-t-8 border-sky-400 text-center">
-            <div class="bg-sky-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i data-lucide="user" class="text-sky-500 w-10 h-10"></i>
+            <div class="bg-sky-50 p-1 rounded-2xl flex mb-8">
+                <button id="tab-login" onclick="setAuthMode('login')" class="tab-btn active flex-1 py-3 rounded-xl font-bold text-slate-500 transition-all">Login</button>
+                <button id="tab-register" onclick="setAuthMode('register')" class="tab-btn flex-1 py-3 rounded-xl font-bold text-slate-500 transition-all">Register</button>
             </div>
-            <h1 class="text-3xl font-black text-slate-800 mb-2">Welcome Explorer!</h1>
-            <p class="text-slate-500 mb-8">Enter a username to start your quest.</p>
-            <input type="text" id="username-input" placeholder="CoolUsername123" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl mb-4 text-center text-xl font-bold outline-sky-400">
-            <button onclick="handleRegister()" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
-                START PLAYING <i data-lucide="play" fill="currentColor" class="w-5 h-5"></i>
+
+            <div class="bg-sky-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i id="auth-icon" data-lucide="user" class="text-sky-500 w-10 h-10"></i>
+            </div>
+            
+            <h1 id="auth-title" class="text-3xl font-black text-slate-800 mb-2">Welcome Back!</h1>
+            <p id="auth-subtitle" class="text-slate-500 mb-8">Enter your details to continue your quest.</p>
+            
+            <div class="space-y-4 mb-6">
+                <div class="text-left">
+                    <label class="text-xs font-bold text-slate-400 uppercase ml-2 mb-1 block">Username</label>
+                    <input type="text" id="username-input" placeholder="CoolExplorer" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-lg font-bold outline-sky-400">
+                </div>
+                <div class="text-left">
+                    <label class="text-xs font-bold text-slate-400 uppercase ml-2 mb-1 block">Password</label>
+                    <input type="password" id="password-input" placeholder="••••••••" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-lg font-bold outline-sky-400">
+                </div>
+            </div>
+
+            <button id="auth-submit-btn" onclick="handleAuthSubmit()" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-black py-4 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                <span id="auth-btn-text">SIGN IN</span> <i data-lucide="chevron-right" class="w-5 h-5"></i>
             </button>
         </div>
     </div>
@@ -70,7 +93,10 @@
         <nav class="max-w-2xl w-full mx-auto flex justify-between items-center mb-4 bg-white/50 backdrop-blur-sm p-3 rounded-2xl shadow-sm">
             <div class="flex items-center gap-3">
                 <div id="user-avatar" class="bg-sky-500 p-2 rounded-lg text-white font-bold w-10 h-10 flex items-center justify-center">?</div>
-                <span id="user-display-name" class="font-bold text-slate-700 hidden sm:block">User</span>
+                <div class="flex flex-col">
+                    <span id="user-display-name" class="font-bold text-slate-700 leading-tight">User</span>
+                    <button onclick="handleLogout()" class="text-[10px] font-bold text-sky-500 uppercase text-left hover:underline">Log Out</button>
+                </div>
             </div>
             <div class="flex gap-2">
                 <button onclick="showPage('game')" id="nav-game" class="px-4 py-2 rounded-xl font-bold transition-all">Play</button>
@@ -149,7 +175,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Config
@@ -168,7 +194,7 @@
         const db = getFirestore(app);
         
         // Environment IDs
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "number-quest-pro-html-v2";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "number-quest-pro-v3";
 
         // Global State
         let currentUser = null;
@@ -178,6 +204,7 @@
         let range = { min: 1, max: 100 };
         let isGameOver = false;
         let hintIndex = 0;
+        let authMode = 'login'; // 'login' or 'register'
 
         // Init App
         window.addEventListener('DOMContentLoaded', () => {
@@ -186,34 +213,14 @@
         });
 
         async function initAuth() {
-            try {
-                // Attempt to use custom token if provided
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    try {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } catch (tokenErr) {
-                        console.warn("Custom token failed (likely mismatch), falling back to anonymous:", tokenErr);
-                        await signInAnonymously(auth);
-                    }
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Fatal Auth Error:", err);
-                if (err.code === 'auth/configuration-not-found') {
-                    showView('error');
-                    document.getElementById('error-message').innerText = "Anonymous login is not enabled in the Firebase Console. If you are a developer, enable it under Authentication > Sign-in method.";
-                    return;
-                }
-                showView('error');
-                document.getElementById('error-message').innerText = "Could not connect to the server: " + err.message;
-            }
-
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     currentUser = user;
                     checkUserStatus();
+                    listenToLeaderboard();
                 } else {
+                    currentUser = null;
+                    userData = null;
                     showView('login');
                 }
             });
@@ -221,17 +228,20 @@
 
         async function checkUserStatus() {
             try {
-                // Doc segments must be even (6)
+                // Ensure auth state is ready
+                if (!currentUser) return;
+                
                 const userDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'main');
                 const snap = await getDoc(userDocRef);
+                
                 if (snap.exists()) {
                     userData = snap.data();
                     updateUserUI();
                     showView('app');
                     showPage('game');
                     startNewGame();
-                    listenToLeaderboard();
                 } else {
+                    // Profile not found - should only happen if registration failed halfway
                     showView('login');
                 }
             } catch (err) {
@@ -243,48 +253,107 @@
         }
 
         function listenToLeaderboard() {
-            if (!currentUser) return;
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
             onSnapshot(q, (snapshot) => {
                 const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 const sorted = list.sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 10);
                 renderLeaderboard(sorted);
             }, (err) => {
-                console.error("Leaderboard Snapshot Error:", err);
+                console.error("Leaderboard Error:", err);
             });
         }
 
-        // Logic Functions
-        window.handleRegister = async () => {
-            const name = document.getElementById('username-input').value.trim();
-            if (!name || !currentUser) return;
+        // Auth Functions
+        window.setAuthMode = (mode) => {
+            authMode = mode;
+            const tabLogin = document.getElementById('tab-login');
+            const tabRegister = document.getElementById('tab-register');
+            const title = document.getElementById('auth-title');
+            const sub = document.getElementById('auth-subtitle');
+            const btnText = document.getElementById('auth-btn-text');
+            const icon = document.getElementById('auth-icon');
 
-            userData = {
-                username: name,
-                points: 0,
-                gamesPlayed: 0,
-                bestAttempt: Infinity,
-                uid: currentUser.uid
-            };
+            if (mode === 'login') {
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+                title.innerText = "Welcome Back!";
+                sub.innerText = "Enter your details to continue your quest.";
+                btnText.innerText = "SIGN IN";
+                icon.setAttribute('data-lucide', 'user');
+            } else {
+                tabRegister.classList.add('active');
+                tabLogin.classList.remove('active');
+                title.innerText = "New Explorer!";
+                sub.innerText = "Create an account to save your progress.";
+                btnText.innerText = "CREATE ACCOUNT";
+                icon.setAttribute('data-lucide', 'sparkles');
+            }
+            lucide.createIcons();
+        };
 
+        window.handleAuthSubmit = async () => {
+            const username = document.getElementById('username-input').value.trim();
+            const password = document.getElementById('password-input').value;
+
+            if (!username || !password) {
+                alert("Please enter both username and password!");
+                return;
+            }
+
+            if (password.length < 6) {
+                alert("Password must be at least 6 characters!");
+                return;
+            }
+
+            // Using username as part of internal email format for Firebase Auth
+            const internalEmail = `${username.toLowerCase()}@numberquest.internal`;
+            
             try {
-                await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'main'), userData);
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', currentUser.uid), {
-                    username: name,
-                    points: 0
-                });
-
-                updateUserUI();
-                showView('app');
-                showPage('game');
-                startNewGame();
-                listenToLeaderboard();
+                showView('loading');
+                if (authMode === 'login') {
+                    await signInWithEmailAndPassword(auth, internalEmail, password);
+                } else {
+                    const userCredential = await createUserWithEmailAndPassword(auth, internalEmail, password);
+                    const user = userCredential.user;
+                    
+                    // Initialize profile
+                    const newProfile = {
+                        username: username,
+                        points: 0,
+                        gamesPlayed: 0,
+                        bestAttempt: Infinity,
+                        uid: user.uid
+                    };
+                    
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'main'), newProfile);
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', user.uid), {
+                        username: username,
+                        points: 0
+                    });
+                    
+                    userData = newProfile;
+                }
             } catch (err) {
-                console.error("Registration Error:", err);
-                alert("Failed to save profile. Check Firestore rules/connection.");
+                console.error("Auth Error:", err);
+                showView('login');
+                if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                    alert("Incorrect username or password. Check your details!");
+                } else if (err.code === 'auth/email-already-in-use') {
+                    alert("This username is already taken! Try another one.");
+                } else {
+                    alert("Oops! Something went wrong: " + err.message);
+                }
             }
         };
 
+        window.handleLogout = async () => {
+            if (confirm("Are you sure you want to log out?")) {
+                await signOut(auth);
+                window.location.reload();
+            }
+        };
+
+        // Game Functions
         window.startNewGame = () => {
             targetNumber = Math.floor(Math.random() * 100) + 1;
             attempts = 0;
@@ -296,7 +365,7 @@
             document.getElementById('guess-input').disabled = false;
             document.getElementById('game-controls').classList.remove('hidden');
             document.getElementById('next-round-btn').classList.add('hidden');
-            document.getElementById('quest-number').innerText = `Quest #${(userData.gamesPlayed || 0) + 1}`;
+            document.getElementById('quest-number').innerText = `Quest #${(userData?.gamesPlayed || 0) + 1}`;
             
             updateFeedback("Pick a number between 1 and 100!", "default", "🤖");
             updateStatsUI();
